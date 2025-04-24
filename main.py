@@ -29,7 +29,6 @@ def main() -> None:
     for expr in exprs:
         print('valida' if valida(expr) else 'invalida')
 
-    # linhas prometidas mas ausentes ⇒ inválidas
     for _ in range(n - len(exprs)):
         print('invalida')
 

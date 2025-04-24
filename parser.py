@@ -5,8 +5,6 @@ from typing import List
 from lexer import TokenType, Token, scan
 
 class Parser:
-    """Parser recursivo-descendente LL(1) para a gramática de fórmulas."""
-
     def __init__(self, tokens: List[Token]) -> None:
         self.tokens = tokens
         self.pos    = 0
@@ -58,7 +56,6 @@ class Parser:
 
 # ---------- API externa: função valida ----------------------------------------
 def valida(expr: str) -> bool:
-    """Devolve True se a expressão *expr* é léxica + sintaticamente correta."""
     try:
         tokens = scan(expr)
         Parser(tokens).parse()

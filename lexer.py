@@ -31,7 +31,6 @@ _OPERATORS = {
 
 # ----------- 3. Scanner (máquina de estados finitos) --------------------------
 def scan(src: str) -> List[Token]:
-    """Retorna a lista de tokens reconhecida em *src* ou lança ValueError."""
     tokens: List[Token] = []
     i, n = 0, len(src)
 
