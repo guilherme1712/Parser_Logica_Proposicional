@@ -1,64 +1,104 @@
-# Guilherme Daudt
-# parser.py – Parser LL(1) + função valida()
-
-from typing import List
-from lexer import TokenType, Token, scan
+# Guilherme Daudt - Matheus Gabriel Pereira Nogueira
+# parser.py – Ponto de entrada que lê o arquivo e imprime valida/invalida
 
 class Parser:
-    def __init__(self, tokens: List[Token]) -> None:
+    def __init__(self, tokens):
         self.tokens = tokens
-        self.pos    = 0
+        self.current_index = 0
+        self.stack = []
+        self.table = self._create_parse_table()
 
-    # ---------- helpers -------------------------------------------------------
-    def _look(self) -> TokenType:
-        return self.tokens[self.pos][1]
+    def _create_parse_table(self):
+        """
+        Cria a tabela de analise sintatica para o parser LL(1)
+        Linhas: nao-terminais
+        Colunas: terminais
+        Valores: producoes a serem aplicadas
+        """
+        table = {}
 
-    def _eat(self, expected: TokenType) -> None:
-        if self._look() == expected:
-            self.pos += 1
-        else:
-            raise ValueError('syntax')
+        # expressao
+        table[('S', 'CONSTANTE')] = ['CONSTANTE']
+        table[('S', 'PROPOSICAO')] = ['PROPOSICAO']
+        table[('S', 'ABREPAREN')] = ['X']  # depende do proximo token
 
-    # ---------- regras --------------------------------------------------------
-    def _formula(self) -> None:
-        t = self._look()
+        # decidir entre U e B
+        table[('X', 'OPERADORUNARIO')] = ['U']
+        table[('X', 'OPERADORBINARIO')] = ['B']
 
-        if t is TokenType.CONST:
-            self._eat(TokenType.CONST)
+        # unaria e binarie
+        table[('U', 'ABREPAREN')] = ['ABREPAREN', 'OPERADORUNARIO', 'S', 'FECHAPAREN']
+        table[('B', 'ABREPAREN')] = ['ABREPAREN', 'OPERADORBINARIO', 'S', 'S', 'FECHAPAREN']
 
-        elif t is TokenType.PROP:
-            self._eat(TokenType.PROP)
+        return table
 
-        elif t is TokenType.LPAREN:
-            self._eat(TokenType.LPAREN)
-            op = self._look()
+    def _current_token(self):
+        """retorna o token atual"""
+        if self.current_index < len(self.tokens):
+            return self.tokens[self.current_index]
+        return None
 
-            if op is TokenType.UNARY_OP:              # ( UNARY_OP FORMULA )
-                self._eat(TokenType.UNARY_OP)
-                self._formula()
-                self._eat(TokenType.RPAREN)
+    def _next_token(self):
+        """avanca para o próximo token e retorna"""
+        if self.current_index + 1 < len(self.tokens):
+            return self.tokens[self.current_index + 1]
+        return None
 
-            elif op is TokenType.BINARY_OP:           # ( BINARY_OP FORMULA FORMULA )
-                self._eat(TokenType.BINARY_OP)
-                self._formula()
-                self._formula()
-                self._eat(TokenType.RPAREN)
+    def _next(self):
+        """avanca o indice do token atual"""
+        self.current_index += 1
 
+    def validate(self):
+        """
+        valida a expressao usando um parser LL(1) com pilha
+        retorna True se a expressao for valida, False caso contrario
+        """
+        # inicia pilha com uma expressao
+        self.stack = ['$', 'S']  # $ = fim da pilha
+
+        while self.stack[-1] != '$':
+            top = self.stack[-1]  # topo
+            token = self._current_token()
+
+            if token is None:
+                return False  # fim dos tokens
+
+            if top == 'X':
+                # decidir entre U e B
+                self.stack.pop()
+                next_token = self._next_token()
+                if next_token and next_token.type == 'OPERADORUNARIO':
+                    production = self.table.get(('X', 'OPERADORUNARIO'), [])
+                    for symbol in reversed(production):
+                        self.stack.append(symbol)
+                elif next_token and next_token.type == 'OPERADORBINARIO':
+                    production = self.table.get(('X', 'OPERADORBINARIO'), [])
+                    for symbol in reversed(production):
+                        self.stack.append(symbol)
+                else:
+                    return False
+                continue
+
+            # se topo for um terminal, verifica se coincide com o token atual
+            if top in ['CONSTANTE', 'PROPOSICAO', 'ABREPAREN', 'FECHAPAREN', 'OPERADORUNARIO', 'OPERADORBINARIO']:
+                if top == token.type:
+                    self.stack.pop()
+                    self._next()
+                else:
+                    return False  # token nao esperado
             else:
-                raise ValueError('syntax')
-        else:
-            raise ValueError('syntax')
+                # topo é um nao-terminal
+                production = self.table.get((top, token.type), None)
 
-    def parse(self) -> None:
-        self._formula()
-        if self._look() is not TokenType.EOF:         # tokens sobrando
-            raise ValueError('syntax')
+                if production is None:
+                    return False
 
-# ---------- API externa: função valida ----------------------------------------
-def valida(expr: str) -> bool:
-    try:
-        tokens = scan(expr)
-        Parser(tokens).parse()
-        return True
-    except ValueError:
-        return False
+                # remove nao terminal
+                self.stack.pop()
+
+                # adiciona producao invertida na pilha
+                for symbol in reversed(production):
+                    self.stack.append(symbol)
+
+        # verifica se foi tudo
+        return self.current_index == len(self.tokens)

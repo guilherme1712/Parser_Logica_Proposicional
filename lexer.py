@@ -1,76 +1,85 @@
-# Guilherme Daudt
-# lexer.py – DFA que converte a string-fonte em tokens da gramática
+# Guilherme Daudt – Matheus Gabriel Pereira Nogueira
+# lexer.py – scanner DFA iterativo (sem recursão)
 
-from enum import Enum, auto
 import re
-from typing import List, Tuple
+from dataclasses import dataclass
+from typing import List
 
-# ----------- 1. Tipos de token ------------------------------------------------
-class TokenType(Enum):
-    LPAREN      = auto()          # (
-    RPAREN      = auto()          # )
-    CONST       = auto()          # true | false
-    PROP        = auto()          # [0-9][0-9a-z]*
-    UNARY_OP    = auto()          # \neg
-    BINARY_OP   = auto()          # \wedge \vee \rightarrow \leftrightarrow
-    EOF         = auto()          # fim de entrada
+# -------- 1. Estrutura de token que o parser espera --------------------------
+@dataclass
+class Token:
+    lexeme: str   # texto original
+    type: str     # classe: CONSTANTE, PROPOSICAO, ABREPAREN, ...
 
-Token = Tuple[str, TokenType]
-
-# ----------- 2. Expressões regulares finais -----------------------------------
-_RE_PROP  = re.compile(r'[0-9][0-9a-z]*')
+# -------- 2. Regex de apoio ---------------------------------------------------
+_RE_PROP  = re.compile(r'[0-9][0-9a-z]*')   # [0-9][0-9a-z]*
 _RE_CONST = re.compile(r'(true|false)')
 
-_OPERATORS = {
-    r'\neg'            : TokenType.UNARY_OP,
-    r'\wedge'          : TokenType.BINARY_OP,
-    r'\vee'            : TokenType.BINARY_OP,
-    r'\rightarrow'     : TokenType.BINARY_OP,
-    r'\leftrightarrow' : TokenType.BINARY_OP,
+_BINARY = {
+    r'\wedge',
+    r'\vee',
+    r'\rightarrow',
+    r'\leftrightarrow',
 }
 
-# ----------- 3. Scanner (máquina de estados finitos) --------------------------
+# -------- 3. DFA iterativo ----------------------------------------------------
 def scan(src: str) -> List[Token]:
+    """
+    Percorre a string *src* caractere a caractere e devolve
+    uma lista de Token(lexeme, type). Lança ValueError em
+    qualquer caractere inesperado.
+    """
     tokens: List[Token] = []
     i, n = 0, len(src)
 
     while i < n:
         ch = src[i]
 
-        if ch.isspace():                       # ignora espaços
+        # —— ignora espaços / quebras de linha
+        if ch.isspace():
             i += 1
             continue
 
+        # —— parênteses
         if ch == '(':
-            tokens.append(('(', TokenType.LPAREN)); i += 1; continue
+            tokens.append(Token('(', 'ABREPAREN')); i += 1; continue
         if ch == ')':
-            tokens.append((')', TokenType.RPAREN)); i += 1; continue
+            tokens.append(Token(')', 'FECHAPAREN')); i += 1; continue
 
-        if ch in ('t', 'f'):                   # constantes
+        # —— constantes true | false
+        if ch in ('t', 'f'):
             m = _RE_CONST.match(src, i)
             if m:
                 lex = m.group(0)
-                tokens.append((lex, TokenType.CONST))
+                tokens.append(Token(lex, 'CONSTANTE'))
                 i += len(lex); continue
 
-        if ch.isdigit():                       # proposições
+        # —— proposições  [0-9][0-9a-z]*
+        if ch.isdigit():
             m = _RE_PROP.match(src, i)
             if m:
                 lex = m.group(0)
-                tokens.append((lex, TokenType.PROP))
+                tokens.append(Token(lex, 'PROPOSICAO'))
                 i += len(lex); continue
 
-        if ch == '\\':                         # operadores
-            for lit, ttype in _OPERATORS.items():
+        # —— operadores iniciados por '\'
+        if ch == '\\':
+            # unário?
+            if src.startswith(r'\neg', i):
+                tokens.append(Token(r'\neg', 'OPERADORUNARIO'))
+                i += 4
+                continue
+            # binário? (tenta cada literal)
+            for lit in _BINARY:
                 if src.startswith(lit, i):
-                    tokens.append((lit, ttype))
+                    tokens.append(Token(lit, 'OPERADORBINARIO'))
                     i += len(lit)
                     break
             else:
                 raise ValueError(f'lexical error at pos {i}')
             continue
 
+        # —— qualquer outro símbolo é erro
         raise ValueError(f'lexical error at pos {i}')
 
-    tokens.append(('', TokenType.EOF))
     return tokens
