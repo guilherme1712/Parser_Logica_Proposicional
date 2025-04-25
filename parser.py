@@ -10,26 +10,22 @@ class Parser:
 
     def _create_parse_table(self):
         """
-        Cria a tabela de analise sintatica para o parser LL(1)
-        Linhas: nao-terminais
-        Colunas: terminais
-        Valores: producoes a serem aplicadas
+        cria a tabela de análise sintática para o parser LL(1)
         """
-        table = {}
+        table = {
+            # inicial
+            ('S', 'CONSTANTE'): ['CONSTANTE'],
+            ('S', 'PROPOSICAO'): ['PROPOSICAO'],
+            ('S', 'ABREPAREN'): ['X'],  # depende do proximo token
 
-        # expressao
-        table[('S', 'CONSTANTE')] = ['CONSTANTE']
-        table[('S', 'PROPOSICAO')] = ['PROPOSICAO']
-        table[('S', 'ABREPAREN')] = ['X']  # depende do proximo token
+            # intermediario?
+            ('X', 'OPERADORUNARIO'): ['U'],
+            ('X', 'OPERADORBINARIO'): ['B'],
 
-        # decidir entre U e B
-        table[('X', 'OPERADORUNARIO')] = ['U']
-        table[('X', 'OPERADORBINARIO')] = ['B']
-
-        # unaria e binarie
-        table[('U', 'ABREPAREN')] = ['ABREPAREN', 'OPERADORUNARIO', 'S', 'FECHAPAREN']
-        table[('B', 'ABREPAREN')] = ['ABREPAREN', 'OPERADORBINARIO', 'S', 'S', 'FECHAPAREN']
-
+            # unario e binarie
+            ('U', 'ABREPAREN'): ['ABREPAREN', 'OPERADORUNARIO', 'S', 'FECHAPAREN'],
+            ('B', 'ABREPAREN'): ['ABREPAREN', 'OPERADORBINARIO', 'S', 'S', 'FECHAPAREN']
+        }
         return table
 
     def _current_token(self):
@@ -39,7 +35,7 @@ class Parser:
         return None
 
     def _next_token(self):
-        """avanca para o próximo token e retorna"""
+        """avanca para o proximo token e retorna"""
         if self.current_index + 1 < len(self.tokens):
             return self.tokens[self.current_index + 1]
         return None
@@ -85,7 +81,7 @@ class Parser:
                     self.stack.pop()
                     self._next()
                 else:
-                    return False  # token nao esperado
+                    return False
             else:
                 # topo é um nao-terminal
                 production = self.table.get((top, token.type), None)
