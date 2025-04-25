@@ -1,7 +1,6 @@
 # Guilherme Daudt – Matheus Gabriel Pereira Nogueira
 # lexer.py – scanner DFA iterativo (sem recursão)
 
-import re
 from dataclasses import dataclass
 from typing import List
 
@@ -11,10 +10,7 @@ class Token:
     lexeme: str   # texto original
     type: str     # classe: CONSTANTE, PROPOSICAO, ABREPAREN, ...
 
-# -------- 2. Regex de apoio ---------------------------------------------------
-_RE_PROP  = re.compile(r'[0-9][0-9a-z]*')   # [0-9][0-9a-z]*
-_RE_CONST = re.compile(r'(true|false)')
-
+# -------- 2. Literais de operador --------------------------------------------
 _BINARY = {
     r'\wedge',
     r'\vee',
@@ -42,25 +38,34 @@ def scan(src: str) -> List[Token]:
 
         # —— parênteses
         if ch == '(':
-            tokens.append(Token('(', 'ABREPAREN')); i += 1; continue
+            tokens.append(Token('(', 'ABREPAREN'))
+            i += 1
+            continue
         if ch == ')':
-            tokens.append(Token(')', 'FECHAPAREN')); i += 1; continue
+            tokens.append(Token(')', 'FECHAPAREN'))
+            i += 1
+            continue
 
-        # —— constantes true | false
-        if ch in ('t', 'f'):
-            m = _RE_CONST.match(src, i)
-            if m:
-                lex = m.group(0)
-                tokens.append(Token(lex, 'CONSTANTE'))
-                i += len(lex); continue
+        # —— constantes true | false (sem regex)
+        if src.startswith('true', i):
+            tokens.append(Token('true', 'CONSTANTE'))
+            i += 4
+            continue
+        if src.startswith('false', i):
+            tokens.append(Token('false', 'CONSTANTE'))
+            i += 5
+            continue
 
-        # —— proposições  [0-9][0-9a-z]*
+        # —— proposições: [0-9][0-9a-z]* (sem regex)
         if ch.isdigit():
-            m = _RE_PROP.match(src, i)
-            if m:
-                lex = m.group(0)
-                tokens.append(Token(lex, 'PROPOSICAO'))
-                i += len(lex); continue
+            start = i
+            i += 1
+            # aceita dígitos ou letras minúsculas
+            while i < n and (src[i].isdigit() or ('a' <= src[i] <= 'z')):
+                i += 1
+            lex = src[start:i]
+            tokens.append(Token(lex, 'PROPOSICAO'))
+            continue
 
         # —— operadores iniciados por '\'
         if ch == '\\':
